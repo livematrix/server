@@ -30,6 +30,7 @@ func main() {
 	db_user := os.Getenv("DATABASE_USER")
 	matrix_user := os.Getenv("MATRIX_USERNAME")
 	matrix_pass := os.Getenv("MATRIX_PASSWORD")
+	server_port := os.Getenv("SERVER_PORT")
 
 	db, err := chat.ConnectSQL(db_user, db_pass, db_name)
 
@@ -56,5 +57,5 @@ func main() {
 
 	// static files
 	http.Handle("/", http.FileServer(http.Dir("webroot")))
-	log.Fatal(http.ListenAndServe(":8000", nil))
+	log.Fatal(http.ListenAndServe(":"+server_port, nil))
 }
