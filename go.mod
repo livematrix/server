@@ -1,4 +1,4 @@
-module osousa.me
+module livechat
 
 go 1.17
 

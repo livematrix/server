@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"osousa.me/chat"
+	"livechat/chat"
 
 	"github.com/joho/godotenv"
 )
