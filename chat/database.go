@@ -361,7 +361,6 @@ func (db *SQLdatabase) UpdateRow(structure interface{}) error {
 // to query the database itself,and it only works on the context of the present
 // in use database
 func (db *SQLdatabase) RawQuery(query string) error {
-	log.Println(query)
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelfunc()
 	res, err := db.db.ExecContext(ctx, query)
@@ -369,12 +368,11 @@ func (db *SQLdatabase) RawQuery(query string) error {
 		log.Printf("Error %s executing raw query", err)
 		return err
 	}
-	rows, err := res.RowsAffected()
+	_, err = res.RowsAffected()
 	if err != nil {
 		log.Printf("Error %s when getting rows affected", err)
 		return err
 	}
-	log.Printf("Rows affected: %d", rows)
 	return nil
 }
 

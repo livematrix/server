@@ -28,6 +28,7 @@ func main() {
 	db_pass := os.Getenv("DATABASE_PASSWORD")
 	db_name := os.Getenv("DATABASE_NAME")
 	db_user := os.Getenv("DATABASE_USER")
+	matrix_recp := os.Getenv("MATRIX_RECIPIENT")
 	matrix_user := os.Getenv("MATRIX_USERNAME")
 	matrix_pass := os.Getenv("MATRIX_PASSWORD")
 	server_port := os.Getenv("SERVER_PORT")
@@ -49,7 +50,7 @@ func main() {
 	db.RawQuery(query)
 
 	App := chat.NewApp()
-	go App.Connect(matrix_user, matrix_pass)
+	go App.Connect(matrix_recp, matrix_user, matrix_pass)
 
 	// websocket server
 	server := chat.NewServer("/entry", App)

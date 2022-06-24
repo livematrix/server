@@ -84,7 +84,6 @@ func (c *Client) GetJSONMessages() []*JSONMessage {
 }
 
 func (c *Client) listenWrite() {
-	log.Println("Listening write to client")
 	for {
 		select {
 
@@ -102,7 +101,6 @@ func (c *Client) listenWrite() {
 }
 
 func (c *Client) listenRead() {
-	log.Println("Listening read from client")
 	for {
 		select {
 

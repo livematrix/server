@@ -99,7 +99,6 @@ func (s *Server) sendAll(msg *JSONMessage) {
 // Trying to access the original request before it upgrades the http connection
 // to a websocket one. Use this to apply any middlewares, as for authentication
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Println(r)
 	tokenCookie, err := r.Cookie("session_id")
 	if err != nil {
 		log.Panic("No session cookie, abort!")
@@ -135,12 +134,9 @@ func (s *Server) Listen() {
 
 		// Add new a client
 		case c := <-s.addCh:
-			log.Println("Added new client")
 			s.clients[c.id] = c
-			log.Println("Now", len(s.clients), "clients connected.")
 			s.sendPastMessages(c)
 			if rid := c.GetRoomId(); *rid != "" {
-				log.Println(*rid != "")
 				s.Mautrix_client.JoinRoomByID(mid.RoomID(*rid))
 			} else {
 				roomid, err := s.Mautrix_client.CreateRoom(c)

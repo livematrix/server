@@ -15,6 +15,7 @@ import (
 )
 
 type BotPlexer struct {
+	recipient      *string
 	username       *string
 	password       *string // only kept until connect
 	client         *mautrix.Client
@@ -32,6 +33,7 @@ func NewApp() *BotPlexer {
 	return &BotPlexer{
 		new(string),
 		new(string),
+		new(string),
 		nil,
 		1,
 		nil,
@@ -40,10 +42,11 @@ func NewApp() *BotPlexer {
 	}
 }
 
-func (b *BotPlexer) Connect(uname, passwd string) {
+func (b *BotPlexer) Connect(recipient, uname, passwd string) {
 	b.timewait = 30
 	b.mostRecentSend = make(map[mid.RoomID]time.Time)
 	username = mid.UserID(uname).String()
+	*b.recipient = recipient
 	*b.username = uname
 	*b.password = passwd
 
@@ -97,7 +100,7 @@ func (b *BotPlexer) CreateRoom(client *Client) (resp mid.RoomID, err error) {
 		Preset:        "public_chat",
 		RoomAliasName: (*client.session.Alias) + "_" + (*client.session.SessionId)[:6],
 		Topic:         "livechat",
-		Invite:        []id.UserID{id.UserID("@osousa:matrix.org")},
+		Invite:        []id.UserID{id.UserID(*b.recipient)},
 	})
 
 	if err != nil {
@@ -141,10 +144,6 @@ func (b *BotPlexer) HandleMessage(source mautrix.EventSource, event *mevent.Even
 		b.Ch <- event
 	}
 	now := time.Now()
-	if now.Sub(b.mostRecentSend[event.RoomID]).Minutes() < b.timewait {
-		log.Infof("Already sent greetings message to %s in the past %f minutes.", event.RoomID, b.timewait)
-		return
-	}
 	b.mostRecentSend[event.RoomID] = now
 }
 
