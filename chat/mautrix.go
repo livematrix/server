@@ -17,6 +17,7 @@ import (
 type BotPlexer struct {
 	recipient      *string
 	username       *string
+	matrix_srvr    *string
 	password       *string // only kept until connect
 	client         *mautrix.Client
 	timewait       float64
@@ -34,6 +35,7 @@ func NewApp() *BotPlexer {
 		new(string),
 		new(string),
 		new(string),
+		new(string),
 		nil,
 		1,
 		nil,
@@ -42,7 +44,7 @@ func NewApp() *BotPlexer {
 	}
 }
 
-func (b *BotPlexer) Connect(recipient, uname, passwd string) {
+func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 	b.timewait = 30
 	b.mostRecentSend = make(map[mid.RoomID]time.Time)
 	username = mid.UserID(uname).String()
@@ -53,7 +55,7 @@ func (b *BotPlexer) Connect(recipient, uname, passwd string) {
 	log.Infof("Logging in %s", username)
 
 	var err error
-	b.client, err = mautrix.NewClient("matrix.privex.io", "", "")
+	b.client, err = mautrix.NewClient(srvr, "", "")
 	if err != nil {
 		panic(err)
 	}

@@ -13,7 +13,6 @@ const channelBufSize = 100
 
 var maxId int = 0
 
-// Chat client.
 type Client struct {
 	id      int
 	ws      *websocket.Conn
@@ -23,7 +22,6 @@ type Client struct {
 	session *Session
 }
 
-// Create new chat client.
 func NewClient(ws *websocket.Conn, server *Server, token *http.Cookie) *Client {
 	if ws == nil {
 		panic("ws cannot be nil")
@@ -66,7 +64,6 @@ func (c *Client) Done() {
 	c.doneCh <- true
 }
 
-// Listen Write and Read request via chanel
 func (c *Client) Listen() {
 	go c.listenWrite()
 	c.listenRead()

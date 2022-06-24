@@ -28,11 +28,12 @@ func main() {
 	db_pass := os.Getenv("DATABASE_PASSWORD")
 	db_name := os.Getenv("DATABASE_NAME")
 	db_user := os.Getenv("DATABASE_USER")
+	server_iface := os.Getenv("SERVER_IFACE")
+	server_port := os.Getenv("SERVER_PORT")
 	matrix_recp := os.Getenv("MATRIX_RECIPIENT")
 	matrix_user := os.Getenv("MATRIX_USERNAME")
 	matrix_pass := os.Getenv("MATRIX_PASSWORD")
-	server_port := os.Getenv("SERVER_PORT")
-
+	matrix_srvr := os.Getenv("MATRIX_SERVER")
 	db, err := chat.ConnectSQL(db_user, db_pass, db_name)
 
 	// If one wishes, they can move this to another file, but not database.go
@@ -50,7 +51,7 @@ func main() {
 	db.RawQuery(query)
 
 	App := chat.NewApp()
-	go App.Connect(matrix_recp, matrix_user, matrix_pass)
+	go App.Connect(matrix_recp, matrix_srvr, matrix_user, matrix_pass)
 
 	// websocket server
 	server := chat.NewServer("/entry", App)
@@ -58,5 +59,5 @@ func main() {
 
 	// static files
 	http.Handle("/", http.FileServer(http.Dir("webroot")))
-	log.Fatal(http.ListenAndServe(":"+server_port, nil))
+	log.Fatal(http.ListenAndServe(server_iface+":"+server_port, nil))
 }
