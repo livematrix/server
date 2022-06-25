@@ -15,15 +15,14 @@ import (
 )
 
 type BotPlexer struct {
-	recipient      *string
-	username       *string
-	matrix_srvr    *string
-	password       *string // only kept until connect
-	client         *mautrix.Client
-	timewait       float64
-	olmMachine     *mcrypto.OlmMachine
-	mostRecentSend map[mid.RoomID]time.Time
-	Ch             chan *mevent.Event
+	recipient   *string
+	username    *string
+	matrix_srvr *string
+	password    *string // only kept until connect
+	client      *mautrix.Client
+	timewait    float64
+	olmMachine  *mcrypto.OlmMachine
+	Ch          chan *mevent.Event
 	//stateStore *store.StateStore
 }
 
@@ -39,14 +38,12 @@ func NewApp() *BotPlexer {
 		nil,
 		1,
 		nil,
-		make(map[mid.RoomID]time.Time),
 		make(chan *mevent.Event, 8),
 	}
 }
 
 func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 	b.timewait = 30
-	b.mostRecentSend = make(map[mid.RoomID]time.Time)
 	username = mid.UserID(uname).String()
 	*b.recipient = recipient
 	*b.username = uname
@@ -145,8 +142,6 @@ func (b *BotPlexer) HandleMessage(source mautrix.EventSource, event *mevent.Even
 	} else {
 		b.Ch <- event
 	}
-	now := time.Now()
-	b.mostRecentSend[event.RoomID] = now
 }
 
 func (b *BotPlexer) SendMessage(roomId mid.RoomID, content *mevent.MessageEventContent) (resp *mautrix.RespSendEvent, err error) {
