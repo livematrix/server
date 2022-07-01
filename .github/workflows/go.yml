@@ -3,6 +3,8 @@ name: Go
 on:
   push:
     branches: [ main, staging ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ main, staging ]
 
@@ -45,8 +47,10 @@ jobs:
     # create release
     - name: Release
       uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/')
+      if: startsWith(github.ref, 'refs/tags/v')
       with:
+        draft: false
+        prerelease: false
         files: |
           output/.env
           output/livematrix
