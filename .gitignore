@@ -2,4 +2,6 @@
 .env.*
 livechat
 livechat*
+livematrix
+output/*
 Session.vim
