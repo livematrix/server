@@ -205,7 +205,7 @@ func (d *SQLdatabase) GetByPk(structure, pk interface{}, field string) error {
 	struct_name := structPtr.Type().Elem().Name()
 
 	if structPtr.Type().Kind() != reflect.Ptr {
-		return errors.New("You must Dereference Struct")
+		return errors.New("You must dereference Struct")
 	}
 
 	columns, fields, _ := structToSlices(structure, nil)
