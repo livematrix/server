@@ -48,7 +48,7 @@ func (d SQLdatabase) GetState() bool {
 // be referenced on the  .ENV file followed by the password in order to connect
 // otherwise a panic occurs. There is no need to defer Disconnect.
 func ConnectSQL(name, password, database, ip_addr, port string) (Database, error) {
-	dbase, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/", name, password, ip_addr, port))
+	dbase, err := sql.Open("mysql", name+":"+password+"@tcp(127.0.0.1:3306)/")
 	if err != nil {
 		log.Printf("Error %s connecting to mysql\n", err)
 		return nil, err
