@@ -228,7 +228,7 @@ func (d *SQLdatabase) GetByPk(structure, pk interface{}, field string) error {
 			panic(err.Error())
 		}
 	} else {
-		return fmt.Errorf("%s object with Id %d does not exist", struct_name, id)
+		return fmt.Errorf("%s object with Id %s does not exist", struct_name, id)
 	}
 	for i, arg := range scan_args {
 		err := SetElem(colTypes[i].DatabaseTypeName(), fields[i], arg, structPtr.Elem().FieldByName(fields[i]).Addr())
