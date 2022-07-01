@@ -57,7 +57,7 @@ func ConnectSQL(name, password, database, ip_addr, port string) (Database, error
 	defer cancelfunc()
 	_, err = dbase.ExecContext(ctx, "CREATE DATABASE IF NOT EXISTS "+database)
 	if err != nil {
-		log.Printf("Error %s when creating DB\n", err)
+		log.Printf("Error %s while creating DB\n", err)
 		return nil, err
 	}
 	dbase.Close()
