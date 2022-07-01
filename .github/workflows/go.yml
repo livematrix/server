@@ -56,7 +56,7 @@ jobs:
       id: push_directory
       uses: cpina/github-action-push-to-another-repository@main
       env:
-        API_TOKEN_GITHUB: ${{ secrets.livematrix.LIVEMATRIX_TOKEN }}
+        API_TOKEN_GITHUB: ${{ secrets.LIVEMATRIX_TOKEN }}
       with:
         source-directory: output/
         destination-github-username: 'osousa'
@@ -70,4 +70,4 @@ jobs:
       run: echo "::set-output name=version::$(./output/livematrix --version)"
       id: version
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.LIVEMATRIX_TOKEN }}
