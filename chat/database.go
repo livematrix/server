@@ -47,7 +47,7 @@ func (d SQLdatabase) GetState() bool {
 // Performs a connection to the database passed as "name" parameter and it must
 // be referenced on the  .ENV file followed by the password in order to connect
 // otherwise a panic occurs. There is no need to defer Disconnect.
-func ConnectSQL(name, password, database string) (Database, error) {
+func ConnectSQL(name, password, database, ip_addr, port string) (Database, error) {
 	dbase, err := sql.Open("mysql", name+":"+password+"@tcp(127.0.0.1:3306)/")
 	if err != nil {
 		log.Printf("Error %s connecting to mysql\n", err)
@@ -57,7 +57,7 @@ func ConnectSQL(name, password, database string) (Database, error) {
 	defer cancelfunc()
 	_, err = dbase.ExecContext(ctx, "CREATE DATABASE IF NOT EXISTS "+database)
 	if err != nil {
-		log.Printf("Error %s when creating DB\n", err)
+		log.Printf("Error %s while creating DB\n", err)
 		return nil, err
 	}
 	dbase.Close()
@@ -108,14 +108,14 @@ func SetElem(in_type, field string, arg, ptr interface{}) error {
 	case "DATETIME":
 		ptr1.SetString(string(arg1.Interface().([]byte)))
 	default:
-		return errors.New(fmt.Sprintf("Database Type unknown:%s\n", in_type))
+		return errors.New(fmt.Sprintf("Database Type Unknown:%s\n", in_type))
 	}
 	return nil
 }
 
 // To extract the values of each struct's field , we must provide the following
 // function with the struct pointer, and a reflect.StructField parameter as the
-// latter contains information regarding the field's type. There's noway around
+// latter contains information regarding the field's type.There's no way around
 // to extract the concrete type of each field, you must use reflect.StructField
 // Add types as needed
 func structToStuctFieldString(structure interface{}, strField reflect.StructField) string {
@@ -205,7 +205,7 @@ func (d *SQLdatabase) GetByPk(structure, pk interface{}, field string) error {
 	struct_name := structPtr.Type().Elem().Name()
 
 	if structPtr.Type().Kind() != reflect.Ptr {
-		return errors.New("You must Dereference Struct")
+		return errors.New("You must dereference Struct")
 	}
 
 	columns, fields, _ := structToSlices(structure, nil)
@@ -228,7 +228,7 @@ func (d *SQLdatabase) GetByPk(structure, pk interface{}, field string) error {
 			panic(err.Error())
 		}
 	} else {
-		return fmt.Errorf("%s object with Id %d does not exist", struct_name, id)
+		return fmt.Errorf("%s object with Id %s does not exist", struct_name, id)
 	}
 	for i, arg := range scan_args {
 		err := SetElem(colTypes[i].DatabaseTypeName(), fields[i], arg, structPtr.Elem().FieldByName(fields[i]).Addr())

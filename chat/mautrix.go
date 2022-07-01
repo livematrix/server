@@ -8,7 +8,6 @@ import (
 	retry "github.com/sethvargo/go-retry"
 	log "github.com/sirupsen/logrus"
 	"maunium.net/go/mautrix"
-	mcrypto "maunium.net/go/mautrix/crypto"
 	mevent "maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 	mid "maunium.net/go/mautrix/id"
@@ -21,7 +20,6 @@ type BotPlexer struct {
 	password    *string // only kept until connect
 	client      *mautrix.Client
 	timewait    float64
-	olmMachine  *mcrypto.OlmMachine
 	Ch          chan *mevent.Event
 	//stateStore *store.StateStore
 }
@@ -37,7 +35,6 @@ func NewApp() *BotPlexer {
 		new(string),
 		nil,
 		1,
-		nil,
 		make(chan *mevent.Event, 8),
 	}
 }

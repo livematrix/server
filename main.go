@@ -28,13 +28,17 @@ func main() {
 	db_pass := os.Getenv("DATABASE_PASSWORD")
 	db_name := os.Getenv("DATABASE_NAME")
 	db_user := os.Getenv("DATABASE_USER")
+	db_ipad := os.Getenv("DATABASE_IPADDR")
+	db_port := os.Getenv("DATABASE_PORT")
 	server_iface := os.Getenv("SERVER_IFACE")
 	server_port := os.Getenv("SERVER_PORT")
 	matrix_recp := os.Getenv("MATRIX_RECIPIENT")
 	matrix_user := os.Getenv("MATRIX_USERNAME")
 	matrix_pass := os.Getenv("MATRIX_PASSWORD")
 	matrix_srvr := os.Getenv("MATRIX_SERVER")
-	db, err := chat.ConnectSQL(db_user, db_pass, db_name)
+
+	// Connect to database, no need to defer
+	db, err := chat.ConnectSQL(db_user, db_pass, db_name, db_ipad, db_port)
 
 	// If one wishes, they can move this to another file, but not database.go
 	query := `CREATE TABLE if not exists Session(
