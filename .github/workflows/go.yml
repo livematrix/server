@@ -56,7 +56,7 @@ jobs:
       id: push_directory
       uses: cpina/github-action-push-to-another-repository@main
       env:
-        API_TOKEN_GITHUB: ${{ secrets.LIVEMATRIX_TOKEN }}
+        API_TOKEN_GITHUB: ${{ secrets.livematrix.LIVEMATRIX_TOKEN }}
       with:
         source-directory: output/
         destination-github-username: 'osousa'
