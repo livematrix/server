@@ -115,7 +115,7 @@ func SetElem(in_type, field string, arg, ptr interface{}) error {
 
 // To extract the values of each struct's field , we must provide the following
 // function with the struct pointer, and a reflect.StructField parameter as the
-// latter contains information regarding the field's type. There's noway around
+// latter contains information regarding the field's type.There's no way around
 // to extract the concrete type of each field, you must use reflect.StructField
 // Add types as needed
 func structToStuctFieldString(structure interface{}, strField reflect.StructField) string {
