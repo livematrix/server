@@ -108,7 +108,7 @@ func SetElem(in_type, field string, arg, ptr interface{}) error {
 	case "DATETIME":
 		ptr1.SetString(string(arg1.Interface().([]byte)))
 	default:
-		return errors.New(fmt.Sprintf("Database Type unknown:%s\n", in_type))
+		return errors.New(fmt.Sprintf("Database Type Unknown:%s\n", in_type))
 	}
 	return nil
 }
