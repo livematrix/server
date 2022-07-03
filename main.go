@@ -49,18 +49,25 @@ func main() {
 	db, err := chat.ConnectSQL(db_user, db_pass, db_name, db_ipad, db_port)
 
 	// If one wishes, they can move this to another file, but not database.go
-	query := `CREATE TABLE if not exists Session(
-			  id int(11) NOT NULL AUTO_INCREMENT,
-			  session varchar(100) NOT NULL,
-			  expirity varchar(100) DEFAULT NULL,
-			  alias varchar(100) DEFAULT NULL,
-			  email varchar(100) DEFAULT NULL,
-			  ip varchar(100) DEFAULT NULL,
-			  RoomID varchar(256) CHARACTER SET utf8 DEFAULT NULL,
-			  PRIMARY KEY (id)
-			) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4;`
+	query01 := `CREATE TABLE if not exists Session(
+				id int(11) NOT NULL AUTO_INCREMENT,
+			  	session varchar(100) NOT NULL,
+			  	expirity varchar(100) DEFAULT NULL,
+			  	alias varchar(100) DEFAULT NULL,
+			  	email varchar(100) DEFAULT NULL,
+			  	ip varchar(100) DEFAULT NULL,
+			  	RoomID varchar(256) CHARACTER SET utf8 DEFAULT NULL,
+			  	PRIMARY KEY (id)
+			  ) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4;`
+	query02 := `CREATE TABLE if not exists Matrix(
+			    token varchar(100) NOT NULL,
+			    userid varchar(100) NOT NULL,
+			    created datetime DEFAULT NULL,
+			    PRIMARY KEY (userid)
+			  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
 
-	db.RawQuery(query)
+	db.RawQuery(query01)
+	db.RawQuery(query02)
 
 	App := chat.NewApp(matrix_time)
 	go App.Connect(matrix_recp, matrix_srvr, matrix_user, matrix_pass)
