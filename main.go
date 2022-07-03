@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"math/rand"
 	"net/http"
@@ -19,8 +20,17 @@ var Debug = log.New(os.Stdout, "\u001b[36mDEBUG: \u001B[0m", log.LstdFlags|log.L
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
+
+	dev := flag.Bool("dev", false, "Set flag to true to use development environment variables")
 	log.SetFlags(log.Lshortfile)
-	err := godotenv.Load()
+	flag.Parse()
+
+	// .env.prod is used by makefile to build
+	envFile := ".env.prod"
+	if *dev {
+		envFile = ".env.dev"
+	}
+	err := godotenv.Load(envFile)
 	if err != nil {
 		log.Fatal("Error loading .env file. Does it exist?")
 	}
@@ -36,25 +46,33 @@ func main() {
 	matrix_user := os.Getenv("MATRIX_USERNAME")
 	matrix_pass := os.Getenv("MATRIX_PASSWORD")
 	matrix_srvr := os.Getenv("MATRIX_SERVER")
+	matrix_time := os.Getenv("MATRIX_TIMEOUT")
 
 	// Connect to database, no need to defer
 	db, err := chat.ConnectSQL(db_user, db_pass, db_name, db_ipad, db_port)
 
 	// If one wishes, they can move this to another file, but not database.go
-	query := `CREATE TABLE if not exists Session(
-			  id int(11) NOT NULL AUTO_INCREMENT,
-			  session varchar(100) NOT NULL,
-			  expirity varchar(100) DEFAULT NULL,
-			  alias varchar(100) DEFAULT NULL,
-			  email varchar(100) DEFAULT NULL,
-			  ip varchar(100) DEFAULT NULL,
-			  RoomID varchar(256) CHARACTER SET utf8 DEFAULT NULL,
-			  PRIMARY KEY (id)
-			) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4;`
+	query01 := `CREATE TABLE if not exists Session(
+				id int(11) NOT NULL AUTO_INCREMENT,
+			  	session varchar(100) NOT NULL,
+			  	expirity varchar(100) DEFAULT NULL,
+			  	alias varchar(100) DEFAULT NULL,
+			  	email varchar(100) DEFAULT NULL,
+			  	ip varchar(100) DEFAULT NULL,
+			  	RoomID varchar(256) CHARACTER SET utf8 DEFAULT NULL,
+			  	PRIMARY KEY (id)
+			  ) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4;`
+	query02 := `CREATE TABLE if not exists Matrix(
+			    token varchar(100) NOT NULL,
+			    userid varchar(100) NOT NULL,
+			    created datetime DEFAULT NULL,
+			    PRIMARY KEY (userid)
+			  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
 
-	db.RawQuery(query)
+	db.RawQuery(query01)
+	db.RawQuery(query02)
 
-	App := chat.NewApp()
+	App := chat.NewApp(matrix_time)
 	go App.Connect(matrix_recp, matrix_srvr, matrix_user, matrix_pass)
 
 	// websocket server

@@ -3,6 +3,7 @@ package chat
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	retry "github.com/sethvargo/go-retry"
@@ -19,53 +20,133 @@ type BotPlexer struct {
 	matrix_srvr *string
 	password    *string // only kept until connect
 	client      *mautrix.Client
-	timewait    float64
+	timeout     int
 	Ch          chan *mevent.Event
-	//stateStore *store.StateStore
 }
 
-var App BotPlexer
-var username string
-
-func NewApp() *BotPlexer {
+func NewApp(timeout string) *BotPlexer {
+	res, _ := strconv.Atoi(timeout)
 	return &BotPlexer{
 		new(string),
 		new(string),
 		new(string),
 		new(string),
 		nil,
-		1,
+		res,
 		make(chan *mevent.Event, 8),
 	}
 }
 
+type Matrix struct {
+	UserID      *string `db:"userid"`
+	Created     *string `db:"created"`
+	AccessToken *string `db:"token"`
+}
+
+func (m *Matrix) GetByPk(pk string) error {
+	var inderface interface{}
+	inderface = pk
+	DB.GetByPk(m, inderface, "userid")
+	return nil
+}
+
+func NewMatrixSession(userid, token, created string) *Matrix {
+	_UserID := new(string)
+	_AccessToken := new(string)
+	_Created := new(string)
+	_UserID = &userid
+	_AccessToken = &token
+	_Created = &created
+	return &Matrix{
+		UserID:      _UserID,
+		AccessToken: _AccessToken,
+		Created:     _Created,
+	}
+}
+
+func (m *Matrix) Create() error {
+	err := DB.InsertRow(m)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Matrix) Save() error {
+	err := DB.UpdateRowPk(m, "userid")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func UseSession(client *mautrix.Client, token, username string) error {
+	client.AccessToken = token
+	client.UserID = (id.UserID)(username)
+	_, err := client.GetOwnPresence()
+	return err
+}
+
+func CreateSession(client *mautrix.Client, password, username string, session *Matrix) error {
+	reqlogin := &mautrix.ReqLogin{
+		Type: mautrix.AuthTypePassword,
+		Identifier: mautrix.UserIdentifier{
+			Type: mautrix.IdentifierTypeUser,
+			User: username,
+		},
+		Password:                 password,
+		InitialDeviceDisplayName: "livematrix",
+		DeviceID:                 "livematrix",
+		StoreCredentials:         true,
+	}
+	_, err := DoRetry("login:pass", func() (interface{}, error) {
+		return client.Login(reqlogin)
+	})
+
+	if err == nil {
+		format := "2006-01-02 15:04:05"
+		created := time.Now().Format(format)
+		if session == nil {
+			session = NewMatrixSession(client.UserID.String(), client.AccessToken, created)
+			session.Create()
+		} else {
+			session.AccessToken = &client.AccessToken
+			session.Created = &created
+			session.Save()
+		}
+	}
+	return err
+}
+
 func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
-	b.timewait = 30
-	username = mid.UserID(uname).String()
+	var err error
+	username := mid.UserID(uname).String()
 	*b.recipient = recipient
 	*b.username = uname
 	*b.password = passwd
 
 	log.Infof("Logging in %s", username)
 
-	var err error
 	b.client, err = mautrix.NewClient(srvr, "", "")
 	if err != nil {
 		panic(err)
 	}
-	_, err = DoRetry("login", func() (interface{}, error) {
-		return b.client.Login(&mautrix.ReqLogin{
-			Type: mautrix.AuthTypePassword,
-			Identifier: mautrix.UserIdentifier{
-				Type: mautrix.IdentifierTypeUser,
-				User: username,
-			},
-			Password:                 *b.password,
-			InitialDeviceDisplayName: "vacation responder",
-			//DeviceID:                 deviceID,
-			StoreCredentials: true,
-		})
-	})
+
+	session := NewMatrixSession("", "", "")
+	session.GetByPk(username)
+	created, _ := time.Parse("2006-01-02 15:04:05", *session.Created)
+
+	if *session.AccessToken != "" && created.Add(time.Duration(b.timeout)*24*time.Hour).After(time.Now()) {
+		err = UseSession(b.client, *session.AccessToken, username)
+	} else {
+		err = CreateSession(b.client, *b.password, username, nil)
+	}
+
+	if err != nil && *session.AccessToken != "" {
+		log.Warningf("Could not login using access token: %s", err.Error())
+		err = CreateSession(b.client, *b.password, username, session)
+	}
+
 	if err != nil {
 		log.Fatalf("Couldn't login to the homeserver.")
 	}
@@ -85,7 +166,6 @@ func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 }
 
 func (b *BotPlexer) GetMessages(roomid mid.RoomID, offset int) []*JSONMessage {
-	//b.client.Messages
 	//TODO
 	return nil
 }
@@ -113,7 +193,7 @@ func (b *BotPlexer) JoinRoomByID(rid mid.RoomID) (*mautrix.RespJoinRoom, error) 
 func DoRetry(description string, fn func() (interface{}, error)) (interface{}, error) {
 	var err error
 	b := retry.NewFibonacci(1 * time.Second)
-	b = retry.WithMaxRetries(5, b)
+	b = retry.WithMaxRetries(3, b)
 	for {
 		log.Info("trying: ", description)
 		var val interface{}
