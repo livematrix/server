@@ -143,7 +143,7 @@ func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 	}
 
 	if err != nil && *session.AccessToken != "" {
-		log.Warning("Could not login using access token: %v", err.Error())
+		log.Warning("Could not login using access token: %s", err.Error())
 		err = CreateSession(b.client, *b.password, username, session)
 	}
 
