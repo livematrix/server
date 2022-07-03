@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"math/rand"
 	"net/http"
@@ -20,7 +21,13 @@ var Debug = log.New(os.Stdout, "\u001b[36mDEBUG: \u001B[0m", log.LstdFlags|log.L
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	log.SetFlags(log.Lshortfile)
-	err := godotenv.Load()
+	dev := flag.Bool("dev", false, "Set flag to true to use development environment variables")
+	flag.Parse()
+	envFile := ".env.prod"
+	if *dev {
+		envFile = ".env.dev"
+	}
+	err := godotenv.Load(envFile)
 	if err != nil {
 		log.Fatal("Error loading .env file. Does it exist?")
 	}

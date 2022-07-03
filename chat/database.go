@@ -23,6 +23,7 @@ type Database interface {
 	GetList(interface{}, *[]interface{}, int) error
 	InsertRow(interface{}) error
 	UpdateRow(interface{}) error
+	UpdateRowPk(interface{}, string) error
 	RawQuery(string) error
 }
 
@@ -320,6 +321,10 @@ func (d *SQLdatabase) GetList(structure interface{}, list *[]interface{}, id int
 // without any prior changes made to it, an error will result showing zero rows
 // affected.
 func (db *SQLdatabase) UpdateRow(structure interface{}) error {
+	return db.UpdateRowPk(structure, "id")
+}
+
+func (db *SQLdatabase) UpdateRowPk(structure interface{}, pk_tag string) error {
 	structPtr := reflect.ValueOf(structure)
 	struct_name := structPtr.Type().Elem().Name()
 	columns, _, vals := structToSlices(structure, nil)
@@ -340,8 +345,8 @@ func (db *SQLdatabase) UpdateRow(structure interface{}) error {
 		vals_str = append(vals_str, structToStuctFieldString(structure, vals[i]))
 	}
 
-	values := append(interfaceSlice(vals_str), structPtr.Elem().FieldByName(structFieldFromTag(vals, "db", "id").Name).Interface())
-	res, err := db.db.Exec("UPDATE "+struct_name+" SET "+params(columns)+" WHERE id = ?", values...)
+	values := append(interfaceSlice(vals_str), structPtr.Elem().FieldByName(structFieldFromTag(vals, "db", pk_tag).Name).Interface())
+	res, err := db.db.Exec("UPDATE "+struct_name+" SET "+params(columns)+" WHERE "+pk_tag+" = ?", values...)
 
 	if err != nil {
 		panic(err.Error())

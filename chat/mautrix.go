@@ -21,7 +21,49 @@ type BotPlexer struct {
 	client      *mautrix.Client
 	timewait    float64
 	Ch          chan *mevent.Event
-	//stateStore *store.StateStore
+}
+
+type Matrix struct {
+	UserID      *string `db:"userid"`
+	Created     *string `db:"created"`
+	AccessToken *string `db:"token"`
+}
+
+func (m *Matrix) GetByPk(pk string) error {
+	var inderface interface{}
+	inderface = pk
+	DB.GetByPk(m, inderface, "userid")
+	return nil
+}
+
+func NewMatrixSession(userid, token, created string) *Matrix {
+	_UserID := new(string)
+	_AccessToken := new(string)
+	_Created := new(string)
+	_UserID = &userid
+	_AccessToken = &token
+	_Created = &created
+	return &Matrix{
+		UserID:      _UserID,
+		AccessToken: _AccessToken,
+		Created:     _Created,
+	}
+}
+
+func (m *Matrix) Create() error {
+	err := DB.InsertRow(m)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Matrix) Save() error {
+	err := DB.UpdateRowPk(m, "userid")
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 var App BotPlexer
@@ -39,7 +81,46 @@ func NewApp() *BotPlexer {
 	}
 }
 
+func UseSession(client *mautrix.Client, token, username string) error {
+	client.AccessToken = token
+	client.UserID = (id.UserID)(username)
+	_, err := client.GetOwnPresence()
+	return err
+}
+
+func CreateSession(client *mautrix.Client, password, username string, session *Matrix) error {
+	reqlogin := &mautrix.ReqLogin{
+		Type: mautrix.AuthTypePassword,
+		Identifier: mautrix.UserIdentifier{
+			Type: mautrix.IdentifierTypeUser,
+			User: username,
+		},
+		Password:                 password,
+		InitialDeviceDisplayName: "livematrix",
+		DeviceID:                 "livematrix",
+		StoreCredentials:         true,
+	}
+	_, err := DoRetry("login:pass", func() (interface{}, error) {
+		return client.Login(reqlogin)
+	})
+
+	if err == nil {
+		format := "2006-01-02 15:04:05"
+		created := time.Now().Format(format)
+		if session.AccessToken == nil {
+			session = NewMatrixSession(client.UserID.String(), client.AccessToken, created)
+			session.Create()
+		} else {
+			session.AccessToken = &client.AccessToken
+			session.Created = &created
+			session.Save()
+		}
+	}
+	return err
+}
+
 func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
+	var err error
 	b.timewait = 30
 	username = mid.UserID(uname).String()
 	*b.recipient = recipient
@@ -48,24 +129,25 @@ func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 
 	log.Infof("Logging in %s", username)
 
-	var err error
 	b.client, err = mautrix.NewClient(srvr, "", "")
 	if err != nil {
 		panic(err)
 	}
-	_, err = DoRetry("login", func() (interface{}, error) {
-		return b.client.Login(&mautrix.ReqLogin{
-			Type: mautrix.AuthTypePassword,
-			Identifier: mautrix.UserIdentifier{
-				Type: mautrix.IdentifierTypeUser,
-				User: username,
-			},
-			Password:                 *b.password,
-			InitialDeviceDisplayName: "vacation responder",
-			//DeviceID:                 deviceID,
-			StoreCredentials: true,
-		})
-	})
+
+	newSession := NewMatrixSession("", "", "")
+	newSession.GetByPk(username)
+
+	if newSession.AccessToken != nil {
+		err = UseSession(b.client, *newSession.AccessToken, username)
+	} else {
+		err = CreateSession(b.client, *b.password, username, nil)
+	}
+
+	if err != nil && newSession.AccessToken != nil {
+		log.Warning("Could not login using access token: %v", err.Error())
+		err = CreateSession(b.client, *b.password, username, newSession)
+	}
+
 	if err != nil {
 		log.Fatalf("Couldn't login to the homeserver.")
 	}
@@ -85,7 +167,6 @@ func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 }
 
 func (b *BotPlexer) GetMessages(roomid mid.RoomID, offset int) []*JSONMessage {
-	//b.client.Messages
 	//TODO
 	return nil
 }
@@ -113,7 +194,7 @@ func (b *BotPlexer) JoinRoomByID(rid mid.RoomID) (*mautrix.RespJoinRoom, error) 
 func DoRetry(description string, fn func() (interface{}, error)) (interface{}, error) {
 	var err error
 	b := retry.NewFibonacci(1 * time.Second)
-	b = retry.WithMaxRetries(5, b)
+	b = retry.WithMaxRetries(3, b)
 	for {
 		log.Info("trying: ", description)
 		var val interface{}

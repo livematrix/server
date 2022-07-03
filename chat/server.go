@@ -79,7 +79,6 @@ func (s *Server) Err(err error) {
 func (s *Server) SendMatrixMessage(c *Client, msg JSONMessage) {
 	var r mid.RoomID
 	r = mid.RoomID(*c.session.RoomID)
-	log.Println(r)
 	content := format.RenderMarkdown(msg.Body, true, true)
 	s.Mautrix_client.SendMessage(r, &content)
 }
@@ -150,7 +149,6 @@ func (s *Server) Listen() {
 
 		// del a client
 		case c := <-s.delCh:
-			log.Println("Delete client")
 			delete(s.clients, c.id)
 
 		// broadcast message for all clients
@@ -162,7 +160,6 @@ func (s *Server) Listen() {
 		case matrix_evt := <-s.Mautrix_client.Ch:
 			client, err := s.FindClientByRoomID(matrix_evt.RoomID)
 			if err == nil {
-				log.Println()
 				jsonmsg := NewJSONMessage(matrix_evt.Content.Raw["body"].(string), "0")
 				client.Write(jsonmsg)
 			}
