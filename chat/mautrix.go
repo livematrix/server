@@ -106,7 +106,6 @@ func CreateSession(client *mautrix.Client, password, username string, session *M
 	if err == nil {
 		format := "2006-01-02 15:04:05"
 		created := time.Now().Format(format)
-		log.Warning(session)
 		if session == nil {
 			session = NewMatrixSession(client.UserID.String(), client.AccessToken, created)
 			session.Create()

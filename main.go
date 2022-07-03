@@ -20,9 +20,12 @@ var Debug = log.New(os.Stdout, "\u001b[36mDEBUG: \u001B[0m", log.LstdFlags|log.L
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	log.SetFlags(log.Lshortfile)
+
 	dev := flag.Bool("dev", false, "Set flag to true to use development environment variables")
+	log.SetFlags(log.Lshortfile)
 	flag.Parse()
+
+	// .env.prod is used by makefile to build
 	envFile := ".env.prod"
 	if *dev {
 		envFile = ".env.dev"
