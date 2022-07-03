@@ -126,7 +126,6 @@ func (s *Server) Listen() {
 	session := NewSession(nil, nil)
 	http.Handle("/session", session)
 	http.Handle(s.pattern, s)
-	log.Println("Created handler")
 
 	for {
 		select {

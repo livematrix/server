@@ -24,6 +24,19 @@ type BotPlexer struct {
 	Ch          chan *mevent.Event
 }
 
+func NewApp(timeout string) *BotPlexer {
+	res, _ := strconv.Atoi(timeout)
+	return &BotPlexer{
+		new(string),
+		new(string),
+		new(string),
+		new(string),
+		nil,
+		res,
+		make(chan *mevent.Event, 8),
+	}
+}
+
 type Matrix struct {
 	UserID      *string `db:"userid"`
 	Created     *string `db:"created"`
@@ -67,22 +80,6 @@ func (m *Matrix) Save() error {
 	return nil
 }
 
-var App BotPlexer
-var username string
-
-func NewApp(timeout string) *BotPlexer {
-	res, _ := strconv.Atoi(timeout)
-	return &BotPlexer{
-		new(string),
-		new(string),
-		new(string),
-		new(string),
-		nil,
-		res,
-		make(chan *mevent.Event, 8),
-	}
-}
-
 func UseSession(client *mautrix.Client, token, username string) error {
 	client.AccessToken = token
 	client.UserID = (id.UserID)(username)
@@ -124,7 +121,7 @@ func CreateSession(client *mautrix.Client, password, username string, session *M
 
 func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 	var err error
-	username = mid.UserID(uname).String()
+	username := mid.UserID(uname).String()
 	*b.recipient = recipient
 	*b.username = uname
 	*b.password = passwd
