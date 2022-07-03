@@ -3,6 +3,7 @@ package chat
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	retry "github.com/sethvargo/go-retry"
@@ -69,14 +70,15 @@ func (m *Matrix) Save() error {
 var App BotPlexer
 var username string
 
-func NewApp(timeout int) *BotPlexer {
+func NewApp(timeout string) *BotPlexer {
+	res, _ := strconv.Atoi(timeout)
 	return &BotPlexer{
 		new(string),
 		new(string),
 		new(string),
 		new(string),
 		nil,
-		timeout,
+		res,
 		make(chan *mevent.Event, 8),
 	}
 }
@@ -107,7 +109,8 @@ func CreateSession(client *mautrix.Client, password, username string, session *M
 	if err == nil {
 		format := "2006-01-02 15:04:05"
 		created := time.Now().Format(format)
-		if session.AccessToken == nil {
+		log.Warning(session)
+		if session == nil {
 			session = NewMatrixSession(client.UserID.String(), client.AccessToken, created)
 			session.Create()
 		} else {
@@ -121,7 +124,6 @@ func CreateSession(client *mautrix.Client, password, username string, session *M
 
 func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 	var err error
-	tomorrow := today.Add(24 * time.Hour)
 	username = mid.UserID(uname).String()
 	*b.recipient = recipient
 	*b.username = uname
@@ -136,17 +138,17 @@ func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 
 	session := NewMatrixSession("", "", "")
 	session.GetByPk(username)
-	created := time.Parse("2006-01-02 15:04:05", session.Created)
+	created, _ := time.Parse("2006-01-02 15:04:05", *session.Created)
 
-	if newSession.AccessToken != nil && b.timeout && created.Add(b.timeout*time.Day).Before(time.Now()) {
-		err = UseSession(b.client, *newSession.AccessToken, username)
+	if *session.AccessToken != "" && created.Add(time.Duration(b.timeout)*24*time.Hour).After(time.Now()) {
+		err = UseSession(b.client, *session.AccessToken, username)
 	} else {
 		err = CreateSession(b.client, *b.password, username, nil)
 	}
 
-	if err != nil && newSession.AccessToken != nil {
+	if err != nil && *session.AccessToken != "" {
 		log.Warning("Could not login using access token: %v", err.Error())
-		err = CreateSession(b.client, *b.password, username, newSession)
+		err = CreateSession(b.client, *b.password, username, session)
 	}
 
 	if err != nil {

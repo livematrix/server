@@ -62,7 +62,7 @@ func main() {
 
 	db.RawQuery(query)
 
-	App := chat.NewApp(matix_time)
+	App := chat.NewApp(matrix_time)
 	go App.Connect(matrix_recp, matrix_srvr, matrix_user, matrix_pass)
 
 	// websocket server
