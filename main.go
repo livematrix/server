@@ -43,6 +43,7 @@ func main() {
 	matrix_user := os.Getenv("MATRIX_USERNAME")
 	matrix_pass := os.Getenv("MATRIX_PASSWORD")
 	matrix_srvr := os.Getenv("MATRIX_SERVER")
+	matrix_time := os.Getenv("MATRIX_TIMEOUT")
 
 	// Connect to database, no need to defer
 	db, err := chat.ConnectSQL(db_user, db_pass, db_name, db_ipad, db_port)
@@ -61,7 +62,7 @@ func main() {
 
 	db.RawQuery(query)
 
-	App := chat.NewApp()
+	App := chat.NewApp(matix_time)
 	go App.Connect(matrix_recp, matrix_srvr, matrix_user, matrix_pass)
 
 	// websocket server

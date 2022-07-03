@@ -19,7 +19,7 @@ type BotPlexer struct {
 	matrix_srvr *string
 	password    *string // only kept until connect
 	client      *mautrix.Client
-	timewait    float64
+	timeout     int
 	Ch          chan *mevent.Event
 }
 
@@ -69,14 +69,14 @@ func (m *Matrix) Save() error {
 var App BotPlexer
 var username string
 
-func NewApp() *BotPlexer {
+func NewApp(timeout int) *BotPlexer {
 	return &BotPlexer{
 		new(string),
 		new(string),
 		new(string),
 		new(string),
 		nil,
-		1,
+		timeout,
 		make(chan *mevent.Event, 8),
 	}
 }
@@ -121,7 +121,7 @@ func CreateSession(client *mautrix.Client, password, username string, session *M
 
 func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 	var err error
-	b.timewait = 30
+	tomorrow := today.Add(24 * time.Hour)
 	username = mid.UserID(uname).String()
 	*b.recipient = recipient
 	*b.username = uname
@@ -134,10 +134,11 @@ func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 		panic(err)
 	}
 
-	newSession := NewMatrixSession("", "", "")
-	newSession.GetByPk(username)
+	session := NewMatrixSession("", "", "")
+	session.GetByPk(username)
+	created := time.Parse("2006-01-02 15:04:05", session.Created)
 
-	if newSession.AccessToken != nil {
+	if newSession.AccessToken != nil && b.timeout && created.Add(b.timeout*time.Day).Before(time.Now()) {
 		err = UseSession(b.client, *newSession.AccessToken, username)
 	} else {
 		err = CreateSession(b.client, *b.password, username, nil)
