@@ -26,7 +26,7 @@ func main() {
 	flag.Parse()
 
 	// .env.prod is used by makefile to build
-	envFile := ".env.prod"
+	envFile := ".env"
 	if *dev {
 		envFile = ".env.dev"
 	}
