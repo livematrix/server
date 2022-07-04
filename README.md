@@ -11,3 +11,10 @@ To test locally, edit **.env.dev** and run:
 ```
 go run . -dev
 ```
+
+For now, you can suppress terminal logs with:
+```
+./livematrix 2>/dev/null &
+```
+
+The only build within the Makefile is for linux, if you want other ones, open an issue, i'll add it. 
