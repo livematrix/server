@@ -9,6 +9,8 @@ import (
 	retry "github.com/sethvargo/go-retry"
 	log "github.com/sirupsen/logrus"
 	"maunium.net/go/mautrix"
+	"maunium.net/go/mautrix/crypto"
+	mcrypto "maunium.net/go/mautrix/crypto"
 	mevent "maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 	mid "maunium.net/go/mautrix/id"
@@ -20,11 +22,34 @@ type BotPlexer struct {
 	matrix_srvr *string
 	password    *string // only kept until connect
 	client      *mautrix.Client
+	olmMachine  *mcrypto.OlmMachine
+	stateStore  *StateStore
 	timeout     int
 	Ch          chan *mevent.Event
+	db          Database
 }
 
-func NewApp(timeout string) *BotPlexer {
+type CryptoLogger struct{}
+
+var _ crypto.Logger = &CryptoLogger{}
+
+func (f CryptoLogger) Error(message string, args ...interface{}) {
+	log.Errorf(message, args...)
+}
+
+func (f CryptoLogger) Warn(message string, args ...interface{}) {
+	log.Warnf(message, args...)
+}
+
+func (f CryptoLogger) Debug(message string, args ...interface{}) {
+	log.Debugf(message, args...)
+}
+
+func (f CryptoLogger) Trace(message string, args ...interface{}) {
+	log.Tracef(message, args...)
+}
+
+func NewApp(timeout string, db Database) *BotPlexer {
 	res, _ := strconv.Atoi(timeout)
 	return &BotPlexer{
 		new(string),
@@ -32,8 +57,11 @@ func NewApp(timeout string) *BotPlexer {
 		new(string),
 		new(string),
 		nil,
+		nil,
+		nil,
 		res,
 		make(chan *mevent.Event, 8),
+		db,
 	}
 }
 
@@ -118,21 +146,95 @@ func CreateSession(client *mautrix.Client, password, username string, session *M
 	return err
 }
 
+func (b *BotPlexer) Sync() (*mautrix.DefaultSyncer, error) {
+	syncer := b.client.Syncer.(*mautrix.DefaultSyncer)
+
+	// Setup the crypto store
+	sqlCryptoStore := mcrypto.NewSQLCryptoStore(
+		b.db.GetDB(),
+		"sqlite3",
+		*b.username,
+		b.client.DeviceID,
+		[]byte("standupbot_cryptostore_key"),
+		CryptoLogger{},
+	)
+	err := sqlCryptoStore.CreateTables()
+	if err != nil {
+		log.Fatal("Could not create tables for the SQL crypto store:%v", err.Error())
+	}
+
+	b.olmMachine = mcrypto.NewOlmMachine(b.client, &CryptoLogger{}, sqlCryptoStore, b.stateStore)
+	err = b.olmMachine.Load()
+
+	//if err != nil {
+	//	return err
+	//	log.Errorf("Could not initialize encryption support. Encrypted rooms will not work.")
+	//}
+
+	syncer.OnSync(func(resp *mautrix.RespSync, since string) bool {
+		b.olmMachine.ProcessSyncResponse(resp, since)
+		return true
+	})
+
+	syncer.OnEventType(mevent.StateMember, func(_ mautrix.EventSource, event *mevent.Event) {
+		b.olmMachine.HandleMemberEvent(event)
+		b.stateStore.SetMembership(event)
+
+		if event.GetStateKey() == *b.username && event.Content.AsMember().Membership == mevent.MembershipInvite {
+			log.Info("Joining ", event.RoomID)
+			_, err := DoRetry("join room", func() (interface{}, error) {
+				return b.client.JoinRoomByID(event.RoomID)
+			})
+			if err != nil {
+				log.Errorf("Could not join channel %s. Error %+v", event.RoomID.String(), err)
+			} else {
+				log.Infof("Joined %s sucessfully", event.RoomID.String())
+			}
+		} else if event.GetStateKey() == *b.username && event.Content.AsMember().Membership.IsLeaveOrBan() {
+			log.Infof("Left or banned from %s", event.RoomID)
+		}
+	})
+
+	syncer.OnEventType(mevent.StateEncryption, func(_ mautrix.EventSource, event *mevent.Event) {
+		b.stateStore.SetEncryptionEvent(event)
+	})
+
+	syncer.OnEventType(mevent.EventMessage, func(source mautrix.EventSource, event *mevent.Event) { go b.HandleMessage(source, event) })
+
+	syncer.OnEventType(mevent.EventEncrypted, func(source mautrix.EventSource, event *mevent.Event) {
+		decryptedEvent, err := b.olmMachine.DecryptMegolmEvent(event)
+		if err != nil {
+			log.Errorf("Failed to decrypt message from %s in %s: %+v", event.Sender, event.RoomID, err)
+		} else {
+			log.Debugf("Received encrypted event from %s in %s", event.Sender, event.RoomID)
+			if decryptedEvent.Type == mevent.EventMessage {
+				go b.HandleMessage(source, decryptedEvent)
+			}
+		}
+	})
+	return syncer, nil
+}
+
 func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 	var err error
+	b.stateStore = NewStateStore(b.db.GetDB())
+	if err := b.stateStore.CreateTables(); err != nil {
+		log.Fatal("Failed to create the tables for vacation responder.", err)
+	}
 	username := mid.UserID(uname).String()
+	b.stateStore = NewStateStore(b.db.GetDB())
 	*b.recipient = recipient
 	*b.username = uname
 	*b.password = passwd
 
 	log.Infof("Logging in %s", username)
-
 	b.client, err = mautrix.NewClient(srvr, "", "")
 	if err != nil {
 		panic(err)
 	}
 
 	session := NewMatrixSession("", "", "")
+
 	session.GetByPk(username)
 	created, _ := time.Parse("2006-01-02 15:04:05", *session.Created)
 
@@ -151,8 +253,10 @@ func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 		log.Fatalf("Couldn't login to the homeserver.")
 	}
 
-	syncer := b.client.Syncer.(*mautrix.DefaultSyncer)
-	syncer.OnEventType(mevent.EventMessage, func(source mautrix.EventSource, event *mevent.Event) { go b.HandleMessage(source, event) })
+	syncer, err := b.Sync()
+	if err != nil || syncer == nil {
+		log.Errorf("Error occurred: %v", err.Error())
+	}
 
 	log.Infof("Logged in as %s/%s", b.client.UserID, b.client.DeviceID)
 

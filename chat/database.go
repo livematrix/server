@@ -7,17 +7,20 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var DB Database
 
 type Database interface {
 	GetState() bool
+	GetDB() *sql.DB
 	GetById(interface{}, int) error
 	GetByPk(a, b interface{}, c string) error
 	GetList(interface{}, *[]interface{}, int) error
@@ -45,26 +48,36 @@ func (d SQLdatabase) GetState() bool {
 	return d.connected
 }
 
+func (d SQLdatabase) GetDB() *sql.DB {
+	return d.db
+}
+
 // Performs a connection to the database passed as "name" parameter and it must
 // be referenced on the  .ENV file followed by the password in order to connect
 // otherwise a panic occurs. There is no need to defer Disconnect.
-func ConnectSQL(name, password, database, ip_addr, port string) (Database, error) {
-	dbase, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/", name, password, ip_addr, port))
-	if err != nil {
-		log.Printf("Error %s connecting to mysql\n", err)
-		return nil, err
+func ConnectSQL(name, password, database, ip_addr, port, dbtype, dbfile string) (Database, error) {
+	var dbase *sql.DB
+	var err error
+	if dbtype == "mysql" {
+		dbase, err = sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/", name, password, ip_addr, port))
+		ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelfunc()
+		_, err = dbase.ExecContext(ctx, "CREATE DATABASE IF NOT EXISTS "+database)
+		if err != nil {
+			log.Printf("Error %s while creating DB\n", err)
+			return nil, err
+		}
+		dbase.Close()
+		dbase, err = sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", name, password, ip_addr, port, database))
+		if err != nil {
+			log.Printf("Error %s using DB\n", err)
+			return nil, err
+		}
+	} else if dbtype == "sqlite3" {
+		dbase, err = sql.Open("sqlite3", dbfile)
 	}
-	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancelfunc()
-	_, err = dbase.ExecContext(ctx, "CREATE DATABASE IF NOT EXISTS "+database)
 	if err != nil {
-		log.Printf("Error %s while creating DB\n", err)
-		return nil, err
-	}
-	dbase.Close()
-	dbase, err = sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", name, password, ip_addr, port, database))
-	if err != nil {
-		log.Printf("Error %s using DB\n", err)
+		log.Printf("Error %s connecting to database\n", err)
 		return nil, err
 	}
 
@@ -90,6 +103,7 @@ func interfaceSlice(strlst []string) []interface{} {
 // is no nil pointer for values not attributed,these are initialized and should
 // have the corresponding Zero value for each type
 func SetElem(in_type, field string, arg, ptr interface{}) error {
+	varchar_regex := regexp.MustCompile("^(?i)varchar.*")
 	arg1 := reflect.ValueOf(arg).Elem()
 	ptr1 := reflect.Indirect(reflect.Indirect(ptr.(reflect.Value)))
 
@@ -98,15 +112,17 @@ func SetElem(in_type, field string, arg, ptr interface{}) error {
 	if arg1.Interface() == nil {
 		return nil
 	}
-
-	switch in_type {
-	case "VARCHAR":
+	log.Println(ptr1)
+	switch {
+	case varchar_regex.MatchString(in_type):
+		ptr1.SetString(string(arg1.Interface().(string)))
+	case in_type == "TEXT":
 		ptr1.SetString(string(arg1.Interface().([]byte)))
-	case "TEXT":
-		ptr1.SetString(string(arg1.Interface().([]byte)))
-	case "INT":
+	case in_type == "INT":
 		ptr1.SetInt(int64(arg1.Interface().(int64)))
-	case "DATETIME":
+	case in_type == "INTEGER":
+		ptr1.SetInt(int64(arg1.Interface().(int64)))
+	case in_type == "DATETIME":
 		ptr1.SetString(string(arg1.Interface().([]byte)))
 	default:
 		return errors.New(fmt.Sprintf("Database Type Unknown:%s\n", in_type))
@@ -396,11 +412,14 @@ func (db *SQLdatabase) InsertRow(structure interface{}) error {
 	}
 
 	params := func(columns []string) string {
-		x := make([]string, 0)
-		for i := 0; i < len(columns); i++ {
-			x = append(x, columns[i]+"=?")
+		return "(" + strings.Join(columns[:], ", ") + ")"
+	}
+	questionvals := func(length int) string {
+		l := make([]string, length)
+		for i := range l {
+			l[i] = "?"
 		}
-		return strings.Join(x[:], ", ")
+		return "(" + strings.Join(l[:], ", ") + ")"
 	}
 
 	for i := 0; i < len(columns); i++ {
@@ -408,7 +427,7 @@ func (db *SQLdatabase) InsertRow(structure interface{}) error {
 	}
 	values := interfaceSlice(vals_str)
 	log.Println(values)
-	res, err := db.db.Exec("INSERT INTO "+struct_name+" SET "+params(columns), values...)
+	res, err := db.db.Exec("INSERT INTO "+struct_name+" "+params(columns)+" VALUES "+questionvals(len(columns)), values...)
 
 	if err != nil {
 		panic(err.Error())

@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/joho/godotenv v1.4.0
+	github.com/mattn/go-sqlite3 v1.14.14
 	github.com/sethvargo/go-retry v0.2.3
 	github.com/sirupsen/logrus v1.8.1
 	golang.org/x/net v0.0.0-20220516155154-20f960328961
