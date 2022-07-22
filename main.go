@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"regexp"
 	"time"
 
 	"livechat/chat"
@@ -26,16 +25,12 @@ func main() {
 	log.SetFlags(log.Lshortfile)
 	flag.Parse()
 
-	// .env is used by makefile to build
-	projectName := regexp.MustCompile(`^(.*output)`)
-	currentWorkDirectory, _ := os.Getwd()
-	rootPath := projectName.Find([]byte(currentWorkDirectory))
-
+	// .env.prod is used by makefile to build
 	envFile := ".env"
 	if *dev {
 		envFile = ".env.dev"
 	}
-	err := godotenv.Load(string(rootPath) + "/" + envFile)
+	err := godotenv.Load(envFile)
 	if err != nil {
 		log.Fatal("Error loading .env file. Does it exist?")
 	}
