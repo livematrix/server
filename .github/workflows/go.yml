@@ -28,13 +28,9 @@ jobs:
 
     - name: Test
       run: go test -v ./...
-
-    - name: create release 
-      uses: actions/upload-artifact@v3
-      if: success()
-      with:
-        name: build
-        path: output/*
+    
+    - name: Compress output
+      run:  tar -zcvf livematrix.tar.gz ./output
         
     # extract branch name
     - name: Extract branch name
@@ -51,14 +47,13 @@ jobs:
     # create release
     - name: Release
       uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/v')
+      if: startsWith(github.ref, 'refs/tags/')
       with:
         draft: false
         prerelease: false
         files: |
-          output/.env
-          output/livematrix
-
+          livematrix.tar.gz
+          
     # Sends build to showcase repository osousa/livematrix
     - name: Pushes to another repository
       id: push_directory
