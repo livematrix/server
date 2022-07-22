@@ -115,7 +115,9 @@ func (s *Session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		*s.IpAddr = r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")]
 		*s.Email = r.PostForm.Get("email")
 		*s.Alias = name + "_" + surname
+		log.Printf("raw r.Host: %s", r.Host)
 		cookie := s.createCookie("session_id", r.Host)
+		log.Printf("domain inside cookie: %s", cookie.Domain)
 		http.SetCookie(w, cookie)
 		*s.SessionId = cookie.Value
 		DB.InsertRow(s)
