@@ -407,7 +407,6 @@ func (db *SQLdatabase) InsertRow(structure interface{}) error {
 		vals_str = append(vals_str, structToStuctFieldString(structure, vals[i]))
 	}
 	values := interfaceSlice(vals_str)
-	log.Println(values)
 	res, err := db.db.Exec("INSERT INTO "+struct_name+" SET "+params(columns), values...)
 
 	if err != nil {
