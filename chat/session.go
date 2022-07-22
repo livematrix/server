@@ -81,7 +81,7 @@ func Hash254(args ...string) string {
 //
 //
 func (s *Session) createCookie(name, domain string) *http.Cookie {
-	m := regexp.MustCompile(`\.?([^.]*.com)`)
+	m := regexp.MustCompile(`\.?([^.]*.[a-z]{0,4})$`)
 	format := "2006-01-02 15:04:05 -0700"
 	if len(m.FindStringSubmatch(domain)) > 1 {
 		domain = "." + m.FindStringSubmatch(domain)[1]
