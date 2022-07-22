@@ -166,10 +166,10 @@ func (b *BotPlexer) Sync() (*mautrix.DefaultSyncer, error) {
 	b.olmMachine = mcrypto.NewOlmMachine(b.client, &CryptoLogger{}, sqlCryptoStore, b.stateStore)
 	err = b.olmMachine.Load()
 
-	//if err != nil {
-	//	return err
-	//	log.Errorf("Could not initialize encryption support. Encrypted rooms will not work.")
-	//}
+	if err != nil {
+		log.Errorf("Could not initialize encryption support. Encrypted rooms will not work.")
+		return nil, err
+	}
 
 	syncer.OnSync(func(resp *mautrix.RespSync, since string) bool {
 		b.olmMachine.ProcessSyncResponse(resp, since)
@@ -234,9 +234,12 @@ func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 	}
 
 	session := NewMatrixSession("", "", "")
-
 	session.GetByPk(username)
-	created, _ := time.Parse("2006-01-02 15:04:05", *session.Created)
+
+	created, _ := time.Parse("2006-1-2 15:4:5 -0700 MST", *session.Created)
+
+	log.Warningln(created)
+	log.Warningln(created.Add(time.Duration(b.timeout) * 24 * time.Hour).After(time.Now()))
 
 	if *session.AccessToken != "" && created.Add(time.Duration(b.timeout)*24*time.Hour).After(time.Now()) {
 		err = UseSession(b.client, *session.AccessToken, username)
@@ -277,7 +280,7 @@ func (b *BotPlexer) GetMessages(roomid mid.RoomID, offset int) []*JSONMessage {
 // There's no goroutine running this function... you have to spawn it somewhere
 func (b *BotPlexer) CreateRoom(client *Client) (resp mid.RoomID, err error) {
 	response, err := b.client.CreateRoom(&mautrix.ReqCreateRoom{
-		Preset:        "public_chat",
+		Preset:        "private_chat",
 		RoomAliasName: (*client.session.Alias) + "_" + (*client.session.SessionId)[:6],
 		Topic:         "livechat",
 		Invite:        []id.UserID{id.UserID(*b.recipient)},
