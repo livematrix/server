@@ -3,7 +3,6 @@ package chat
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
@@ -36,7 +35,7 @@ func NewSession(msgs *[]Message, sess_id []byte, args ...*string) *Session {
 			new(string),
 			new(string),
 			new(string),
-			msgs,
+			new([]Message),
 			new(sync.Mutex),
 		}
 	} else if len(args) == 5 {
@@ -89,7 +88,6 @@ func (s *Session) createCookie(name, domain string) *http.Cookie {
 	*s.Expirity = time.Now().Add(365 * 24 * time.Hour).Format(format)
 	*s.SessionId = Hash254(strconv.Itoa(rand.Intn(128000)) + *s.Expirity)
 	time, _ := time.Parse(format, *s.Expirity)
-	fmt.Println()
 	return &http.Cookie{
 		Value:   *s.SessionId,
 		Name:    "session_id",
@@ -107,7 +105,6 @@ func (s *Session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Please pass the data as URL form encoded", http.StatusBadRequest)
 		return
 	}
-	log.Println(r.RemoteAddr)
 	tokenCookie, err := r.Cookie("session_id")
 	if err != nil {
 		name := r.PostForm.Get("name")
@@ -115,9 +112,7 @@ func (s *Session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		*s.IpAddr = r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")]
 		*s.Email = r.PostForm.Get("email")
 		*s.Alias = name + "_" + surname
-		log.Printf("raw r.Host: %s", r.Host)
 		cookie := s.createCookie("session_id", r.Host)
-		log.Printf("domain inside cookie: %s", cookie.Domain)
 		http.SetCookie(w, cookie)
 		*s.SessionId = cookie.Value
 		DB.InsertRow(s)

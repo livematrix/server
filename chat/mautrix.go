@@ -212,6 +212,7 @@ func DoRetry(description string, fn func() (interface{}, error)) (interface{}, e
 	}
 	return nil, err
 }
+
 func (b *BotPlexer) HandleMessage(source mautrix.EventSource, event *mevent.Event) {
 	// If event is from ourselves, ignore
 	if event.Sender.String() == *b.username {

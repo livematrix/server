@@ -22,7 +22,7 @@ type Client struct {
 	session *Session
 }
 
-func NewClient(ws *websocket.Conn, server *Server, token *http.Cookie) *Client {
+func NewClient(ws *websocket.Conn, server *Server, token *http.Cookie) (error, *Client) {
 	if ws == nil {
 		panic("ws cannot be nil")
 	}
@@ -37,9 +37,10 @@ func NewClient(ws *websocket.Conn, server *Server, token *http.Cookie) *Client {
 	err := DB.GetByPk(session, token.Value, "session")
 	if err != nil {
 		log.Println(err)
+		return err, nil
 	}
 
-	return &Client{maxId, ws, server, ch, doneCh, session}
+	return nil, &Client{maxId, ws, server, ch, doneCh, session}
 }
 
 func (c *Client) GetRoomId() *string {
@@ -116,6 +117,9 @@ func (c *Client) listenRead() {
 			} else if err != nil {
 				c.server.Err(err)
 			} else {
+				c.server.clients[*c.session.SessionId].history = append(c.server.clients[*c.session.SessionId].history, NewMessage(&msg.Author, &msg.Body))
+				//broadcasting to same client sockets, excluding self:
+				c.server.Broadcast(c, &msg, true)
 				c.server.SendMatrixMessage(c, msg)
 			}
 		}
