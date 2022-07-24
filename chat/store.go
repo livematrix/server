@@ -57,7 +57,7 @@ func (store *StateStore) CreateTables() error {
 		`
 		CREATE TABLE IF NOT EXISTS rooms (
 			room_id           VARCHAR(255) PRIMARY KEY,
-			encryption_event  VARCHAR(65535) NULL
+			encryption_event  TEXT NULL
 		)
 		`,
 		`

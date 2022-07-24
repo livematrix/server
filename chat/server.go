@@ -12,6 +12,7 @@ import (
 
 // Chat server.
 type Server struct {
+	encrypted      bool
 	pattern        string
 	messages       []*JSONMessage
 	clients        map[int]*Client
@@ -24,7 +25,7 @@ type Server struct {
 }
 
 // Create new chat server.
-func NewServer(pattern string, mautrix_client *BotPlexer) *Server {
+func NewServer(pattern string, encrypted bool, mautrix_client *BotPlexer) *Server {
 	messages := []*JSONMessage{}
 	clients := make(map[int]*Client)
 	addCh := make(chan *Client)
@@ -34,6 +35,7 @@ func NewServer(pattern string, mautrix_client *BotPlexer) *Server {
 	errCh := make(chan error)
 
 	return &Server{
+		encrypted,
 		pattern,
 		messages,
 		clients,
@@ -137,7 +139,7 @@ func (s *Server) Listen() {
 			if rid := c.GetRoomId(); *rid != "" {
 				s.Mautrix_client.JoinRoomByID(mid.RoomID(*rid))
 			} else {
-				roomid, err := s.Mautrix_client.CreateRoom(c)
+				roomid, err := s.Mautrix_client.CreateRoom(c, s.encrypted)
 				if err != nil {
 					log.Println("Could not create room, abort!")
 				} else {

@@ -21,6 +21,7 @@ var Error = log.New(os.Stdout, "\u001b[31mERROR: \u001b[0m", log.LstdFlags|log.L
 var Debug = log.New(os.Stdout, "\u001b[36mDEBUG: \u001B[0m", log.LstdFlags|log.Lshortfile)
 
 func main() {
+	var matrix_rypt bool
 	rand.Seed(time.Now().UnixNano())
 
 	dbfile := flag.String("dbfile", "./livematrix.db", "the SQLite DB file to use")
@@ -40,6 +41,7 @@ func main() {
 	}
 
 	// Configuration file parsing from .env
+	db_type := os.Getenv("DATABASE_TYPE")
 	db_pass := os.Getenv("DATABASE_PASSWORD")
 	db_name := os.Getenv("DATABASE_NAME")
 	db_user := os.Getenv("DATABASE_USER")
@@ -52,9 +54,15 @@ func main() {
 	matrix_pass := os.Getenv("MATRIX_PASSWORD")
 	matrix_srvr := os.Getenv("MATRIX_SERVER")
 	matrix_time := os.Getenv("MATRIX_TIMEOUT")
+	matrix_enc := os.Getenv("MATRIX_ENCRYPTED")
+	if matrix_enc == "true" || matrix_enc == "True" {
+		matrix_rypt = true
+	} else {
+		matrix_rypt = false
+	}
 
 	// Connect to database, no need to defer
-	db, err := chat.ConnectSQL(db_user, db_pass, db_name, db_ipad, db_port, "sqlite3", *dbfile)
+	db, err := chat.ConnectSQL(db_user, db_pass, db_name, db_ipad, db_port, db_type, *dbfile)
 
 	// Make sure to exit cleanly
 	c := make(chan os.Signal, 1)
@@ -76,11 +84,11 @@ func main() {
 	}()
 
 	// If one wishes, they can move this to another file, but not database.go
-	App := chat.NewApp(matrix_time, db)
-	go App.Connect(matrix_recp, matrix_srvr, matrix_user, matrix_pass)
+	App := chat.NewApp(matrix_time, matrix_rypt, db)
+	go App.Connect(matrix_recp, matrix_srvr, matrix_user, matrix_pass, matrix_rypt)
 
 	// websocket server
-	server := chat.NewServer("/entry", App)
+	server := chat.NewServer("/entry", matrix_rypt, App)
 	go server.Listen()
 
 	// static files

@@ -3,6 +3,7 @@ package chat
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -23,6 +24,7 @@ type BotPlexer struct {
 	password    *string // only kept until connect
 	client      *mautrix.Client
 	olmMachine  *mcrypto.OlmMachine
+	encrypted   bool
 	stateStore  *StateStore
 	timeout     int
 	Ch          chan *mevent.Event
@@ -49,7 +51,7 @@ func (f CryptoLogger) Trace(message string, args ...interface{}) {
 	log.Tracef(message, args...)
 }
 
-func NewApp(timeout string, db Database) *BotPlexer {
+func NewApp(timeout string, encrypted bool, db Database) *BotPlexer {
 	res, _ := strconv.Atoi(timeout)
 	return &BotPlexer{
 		new(string),
@@ -58,6 +60,7 @@ func NewApp(timeout string, db Database) *BotPlexer {
 		new(string),
 		nil,
 		nil,
+		encrypted,
 		nil,
 		res,
 		make(chan *mevent.Event, 8),
@@ -72,9 +75,11 @@ type Matrix struct {
 }
 
 func (m *Matrix) GetByPk(pk string) error {
+	re := regexp.MustCompile("[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}")
 	var inderface interface{}
 	inderface = pk
 	DB.GetByPk(m, inderface, "userid")
+	*m.Created = re.FindStringSubmatch(*m.Created)[0]
 	return nil
 }
 
@@ -146,7 +151,18 @@ func CreateSession(client *mautrix.Client, password, username string, session *M
 	return err
 }
 
-func (b *BotPlexer) Sync() (*mautrix.DefaultSyncer, error) {
+func (b *BotPlexer) Sync(encrypted bool) (*mautrix.DefaultSyncer, error) {
+	if encrypted {
+		return b.CryptoSync()
+	}
+
+	syncer := b.client.Syncer.(*mautrix.DefaultSyncer)
+	syncer.OnEventType(mevent.EventMessage, func(source mautrix.EventSource, event *mevent.Event) { go b.HandleMessage(source, event) })
+
+	return syncer, nil
+}
+
+func (b *BotPlexer) CryptoSync() (*mautrix.DefaultSyncer, error) {
 	syncer := b.client.Syncer.(*mautrix.DefaultSyncer)
 
 	// Setup the crypto store
@@ -215,11 +231,11 @@ func (b *BotPlexer) Sync() (*mautrix.DefaultSyncer, error) {
 	return syncer, nil
 }
 
-func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
+func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string, encrypted bool) {
 	var err error
 	b.stateStore = NewStateStore(b.db.GetDB())
 	if err := b.stateStore.CreateTables(); err != nil {
-		log.Fatal("Failed to create the tables for vacation responder.", err)
+		log.Fatal("Failed to create the tables for livematrix", err)
 	}
 	username := mid.UserID(uname).String()
 	b.stateStore = NewStateStore(b.db.GetDB())
@@ -236,10 +252,7 @@ func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 	session := NewMatrixSession("", "", "")
 	session.GetByPk(username)
 
-	created, _ := time.Parse("2006-1-2 15:4:5 -0700 MST", *session.Created)
-
-	log.Warningln(created)
-	log.Warningln(created.Add(time.Duration(b.timeout) * 24 * time.Hour).After(time.Now()))
+	created, _ := time.Parse("2006-1-2 15:4:5", *session.Created)
 
 	if *session.AccessToken != "" && created.Add(time.Duration(b.timeout)*24*time.Hour).After(time.Now()) {
 		err = UseSession(b.client, *session.AccessToken, username)
@@ -256,7 +269,7 @@ func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string) {
 		log.Fatalf("Couldn't login to the homeserver.")
 	}
 
-	syncer, err := b.Sync()
+	syncer, err := b.Sync(encrypted)
 	if err != nil || syncer == nil {
 		log.Errorf("Error occurred: %v", err.Error())
 	}
@@ -278,9 +291,15 @@ func (b *BotPlexer) GetMessages(roomid mid.RoomID, offset int) []*JSONMessage {
 }
 
 // There's no goroutine running this function... you have to spawn it somewhere
-func (b *BotPlexer) CreateRoom(client *Client) (resp mid.RoomID, err error) {
+func (b *BotPlexer) CreateRoom(client *Client, encrypted bool) (resp mid.RoomID, err error) {
+	var preset string
+	if encrypted {
+		preset = "private_chat"
+	} else {
+		preset = "public_chat"
+	}
 	response, err := b.client.CreateRoom(&mautrix.ReqCreateRoom{
-		Preset:        "private_chat",
+		Preset:        preset,
 		RoomAliasName: (*client.session.Alias) + "_" + (*client.session.SessionId)[:6],
 		Topic:         "livechat",
 		Invite:        []id.UserID{id.UserID(*b.recipient)},
