@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,7 +35,7 @@ func NewSession(msgs *[]Message, sess_id []byte, args ...*string) *Session {
 			new(string),
 			new(string),
 			new(string),
-			msgs,
+			new([]Message),
 			new(sync.Mutex),
 		}
 	} else if len(args) == 5 {
@@ -75,29 +76,35 @@ func Hash254(args ...string) string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
-// Mutexes might not be enough , so we sleep for a bit in order to make sure we
-// get a different token every time, avoiding race conditions that could result
-// in a duplicate token
-func (s *Session) createCookie(name string) *http.Cookie {
+//
+//
+//
+func (s *Session) createCookie(name, domain string) *http.Cookie {
+	m := regexp.MustCompile(`\.?([^.]*.[a-z]{0,4})$`)
 	format := "2006-01-02 15:04:05 -0700"
+	if len(m.FindStringSubmatch(domain)) > 1 {
+		domain = "." + m.FindStringSubmatch(domain)[1]
+	}
 	*s.Expirity = time.Now().Add(365 * 24 * time.Hour).Format(format)
-	//Not that secure...
 	*s.SessionId = Hash254(strconv.Itoa(rand.Intn(128000)) + *s.Expirity)
 	time, _ := time.Parse(format, *s.Expirity)
 	return &http.Cookie{
 		Value:   *s.SessionId,
 		Name:    "session_id",
+		Domain:  domain,
 		Expires: time,
 	}
 }
 
+//
+//
+//
 func (s *Session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
 		http.Error(w, "Please pass the data as URL form encoded", http.StatusBadRequest)
 		return
 	}
-	log.Println(r.RemoteAddr)
 	tokenCookie, err := r.Cookie("session_id")
 	if err != nil {
 		name := r.PostForm.Get("name")
@@ -105,7 +112,7 @@ func (s *Session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		*s.IpAddr = r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")]
 		*s.Email = r.PostForm.Get("email")
 		*s.Alias = name + "_" + surname
-		cookie := s.createCookie("session_id")
+		cookie := s.createCookie("session_id", r.Host)
 		http.SetCookie(w, cookie)
 		*s.SessionId = cookie.Value
 		DB.InsertRow(s)

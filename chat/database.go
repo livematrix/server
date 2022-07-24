@@ -422,7 +422,6 @@ func (db *SQLdatabase) RawQuery(query string) error {
 //
 //
 //
-//
 func (db *SQLdatabase) InsertRow(structure interface{}) error {
 	structPtr := reflect.ValueOf(structure)
 	struct_name := structPtr.Type().Elem().Name()
@@ -447,7 +446,6 @@ func (db *SQLdatabase) InsertRow(structure interface{}) error {
 		vals_str = append(vals_str, structToStuctFieldString(structure, vals[i]))
 	}
 	values := interfaceSlice(vals_str)
-	log.Println(values)
 	res, err := db.db.Exec("INSERT INTO "+struct_name+" "+params(columns)+" VALUES "+questionvals(len(columns)), values...)
 
 	if err != nil {
