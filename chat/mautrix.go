@@ -78,7 +78,10 @@ func (m *Matrix) GetByPk(pk string) error {
 	re := regexp.MustCompile("[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}")
 	var inderface interface{}
 	inderface = pk
-	DB.GetByPk(m, inderface, "userid")
+	err := DB.GetByPk(m, inderface, "userid")
+	if err != nil {
+		return err
+	}
 	*m.Created = re.FindStringSubmatch(*m.Created)[0]
 	return nil
 }
