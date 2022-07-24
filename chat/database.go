@@ -7,17 +7,20 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var DB Database
 
 type Database interface {
 	GetState() bool
+	GetDB() *sql.DB
 	GetById(interface{}, int) error
 	GetByPk(a, b interface{}, c string) error
 	GetList(interface{}, *[]interface{}, int) error
@@ -30,13 +33,15 @@ type Database interface {
 type SQLdatabase struct {
 	db        *sql.DB
 	connected bool
+	_type     string
 	name      string
 }
 
-func NewDatabase(sqldb *sql.DB, name string) Database {
+func NewDatabase(sqldb *sql.DB, name, dbtype string) Database {
 	return &SQLdatabase{
 		db:        sqldb,
 		connected: true,
+		_type:     dbtype,
 		name:      name,
 	}
 }
@@ -45,30 +50,40 @@ func (d SQLdatabase) GetState() bool {
 	return d.connected
 }
 
+func (d SQLdatabase) GetDB() *sql.DB {
+	return d.db
+}
+
 // Performs a connection to the database passed as "name" parameter and it must
 // be referenced on the  .ENV file followed by the password in order to connect
 // otherwise a panic occurs. There is no need to defer Disconnect.
-func ConnectSQL(name, password, database, ip_addr, port string) (Database, error) {
-	dbase, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/", name, password, ip_addr, port))
-	if err != nil {
-		log.Printf("Error %s connecting to mysql\n", err)
-		return nil, err
+func ConnectSQL(name, password, database, ip_addr, port, dbtype, dbfile string) (Database, error) {
+	var dbase *sql.DB
+	var err error
+	if dbtype == "mysql" {
+		dbase, err = sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/", name, password, ip_addr, port))
+		ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelfunc()
+		_, err = dbase.ExecContext(ctx, "CREATE DATABASE IF NOT EXISTS "+database)
+		if err != nil {
+			log.Printf("Error %s while creating DB\n", err)
+			return nil, err
+		}
+		dbase.Close()
+		dbase, err = sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", name, password, ip_addr, port, database))
+		if err != nil {
+			log.Printf("Error %s using DB\n", err)
+			return nil, err
+		}
+	} else if dbtype == "sqlite3" {
+		dbase, err = sql.Open("sqlite3", dbfile)
 	}
-	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancelfunc()
-	_, err = dbase.ExecContext(ctx, "CREATE DATABASE IF NOT EXISTS "+database)
 	if err != nil {
-		log.Printf("Error %s while creating DB\n", err)
-		return nil, err
-	}
-	dbase.Close()
-	dbase, err = sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", name, password, ip_addr, port, database))
-	if err != nil {
-		log.Printf("Error %s using DB\n", err)
+		log.Printf("Error %s connecting to database\n", err)
 		return nil, err
 	}
 
-	db := NewDatabase(dbase, name)
+	db := NewDatabase(dbase, name, dbtype)
 	DB = db
 	return db, nil
 }
@@ -89,7 +104,9 @@ func interfaceSlice(strlst []string) []interface{} {
 // otherwise it'll panic. More type conversions should be added at will . There
 // is no nil pointer for values not attributed,these are initialized and should
 // have the corresponding Zero value for each type
-func SetElem(in_type, field string, arg, ptr interface{}) error {
+func SetElem(in_type, field, dbtype string, arg, ptr interface{}) error {
+	varchar_regex := regexp.MustCompile("^(?i)varchar.*")
+	datetime_regex := regexp.MustCompile("^(?i)datetime.*")
 	arg1 := reflect.ValueOf(arg).Elem()
 	ptr1 := reflect.Indirect(reflect.Indirect(ptr.(reflect.Value)))
 
@@ -99,17 +116,37 @@ func SetElem(in_type, field string, arg, ptr interface{}) error {
 		return nil
 	}
 
-	switch in_type {
-	case "VARCHAR":
-		ptr1.SetString(string(arg1.Interface().([]byte)))
-	case "TEXT":
-		ptr1.SetString(string(arg1.Interface().([]byte)))
-	case "INT":
-		ptr1.SetInt(int64(arg1.Interface().(int64)))
-	case "DATETIME":
-		ptr1.SetString(string(arg1.Interface().([]byte)))
-	default:
-		return errors.New(fmt.Sprintf("Database Type Unknown:%s\n", in_type))
+	if dbtype == "sqlite3" {
+		switch {
+		case varchar_regex.MatchString(in_type):
+			ptr1.SetString(string(arg1.Interface().(string)))
+		case in_type == "TEXT":
+			ptr1.SetString(string(arg1.Interface().(string)))
+		case in_type == "INT":
+			ptr1.SetInt(int64(arg1.Interface().(int64)))
+		case in_type == "INTEGER":
+			ptr1.SetInt(int64(arg1.Interface().(int64)))
+		case datetime_regex.MatchString(in_type):
+			ptr1.SetString((arg1.Interface().(time.Time).String()))
+		default:
+			return errors.New(fmt.Sprintf("Database Type Unknown:%s\n", in_type))
+		}
+	} else if dbtype == "mysql" {
+		switch {
+		case varchar_regex.MatchString(in_type):
+			ptr1.SetString(string(arg1.Interface().([]byte)))
+		case in_type == "TEXT":
+			ptr1.SetString(string(arg1.Interface().([]byte)))
+		case in_type == "INT":
+			ptr1.SetInt(int64(arg1.Interface().(int64)))
+		case in_type == "INTEGER":
+			ptr1.SetInt(int64(arg1.Interface().(int64)))
+		case in_type == "DATETIME":
+			ptr1.SetString(string(arg1.Interface().([]byte)))
+		default:
+			return errors.New(fmt.Sprintf("Database Type Unknown:%s\n", in_type))
+		}
+
 	}
 	return nil
 }
@@ -232,7 +269,7 @@ func (d *SQLdatabase) GetByPk(structure, pk interface{}, field string) error {
 		return fmt.Errorf("%s object with Id %s does not exist", struct_name, id)
 	}
 	for i, arg := range scan_args {
-		err := SetElem(colTypes[i].DatabaseTypeName(), fields[i], arg, structPtr.Elem().FieldByName(fields[i]).Addr())
+		err := SetElem(colTypes[i].DatabaseTypeName(), fields[i], d._type, arg, structPtr.Elem().FieldByName(fields[i]).Addr())
 		if err != nil {
 			panic(err)
 		}
@@ -290,7 +327,7 @@ func (d *SQLdatabase) GetList(structure interface{}, list *[]interface{}, id int
 		_, structType := NewReflectPtr(structure)
 		interfaceSlice = append(interfaceSlice, structType)
 		for i, arg := range scan_args {
-			err := SetElem(colTypes[i].DatabaseTypeName(), fields[i], arg, structType.Elem().FieldByName(fields[i]))
+			err := SetElem(colTypes[i].DatabaseTypeName(), fields[i], d._type, arg, structType.Elem().FieldByName(fields[i]))
 			if err != nil {
 				panic(err)
 			}
@@ -300,7 +337,7 @@ func (d *SQLdatabase) GetList(structure interface{}, list *[]interface{}, id int
 			_, structType2 := NewReflectPtr(structure)
 			interfaceSlice = append(interfaceSlice, structType2)
 			for i, arg := range scan_args {
-				err := SetElem(colTypes[i].DatabaseTypeName(), fields[i], arg, structType2.Elem().FieldByName(fields[i]).Addr())
+				err := SetElem(colTypes[i].DatabaseTypeName(), fields[i], d._type, arg, structType2.Elem().FieldByName(fields[i]).Addr())
 				if err != nil {
 					panic(err)
 				}
@@ -385,7 +422,6 @@ func (db *SQLdatabase) RawQuery(query string) error {
 //
 //
 //
-//
 func (db *SQLdatabase) InsertRow(structure interface{}) error {
 	structPtr := reflect.ValueOf(structure)
 	struct_name := structPtr.Type().Elem().Name()
@@ -396,18 +432,21 @@ func (db *SQLdatabase) InsertRow(structure interface{}) error {
 	}
 
 	params := func(columns []string) string {
-		x := make([]string, 0)
-		for i := 0; i < len(columns); i++ {
-			x = append(x, columns[i]+"=?")
+		return "(" + strings.Join(columns[:], ", ") + ")"
+	}
+	questionvals := func(length int) string {
+		l := make([]string, length)
+		for i := range l {
+			l[i] = "?"
 		}
-		return strings.Join(x[:], ", ")
+		return "(" + strings.Join(l[:], ", ") + ")"
 	}
 
 	for i := 0; i < len(columns); i++ {
 		vals_str = append(vals_str, structToStuctFieldString(structure, vals[i]))
 	}
 	values := interfaceSlice(vals_str)
-	res, err := db.db.Exec("INSERT INTO "+struct_name+" SET "+params(columns), values...)
+	res, err := db.db.Exec("INSERT INTO "+struct_name+" "+params(columns)+" VALUES "+questionvals(len(columns)), values...)
 
 	if err != nil {
 		panic(err.Error())
