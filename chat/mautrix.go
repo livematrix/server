@@ -168,7 +168,6 @@ func (b *BotPlexer) Sync(encrypted bool) (*mautrix.DefaultSyncer, error) {
 func (b *BotPlexer) CryptoSync() (*mautrix.DefaultSyncer, error) {
 	syncer := b.client.Syncer.(*mautrix.DefaultSyncer)
 
-	// Setup the crypto store
 	sqlCryptoStore := mcrypto.NewSQLCryptoStore(
 		b.db.GetDB(),
 		"sqlite3",
