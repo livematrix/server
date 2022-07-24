@@ -176,7 +176,7 @@ func (b *BotPlexer) CryptoSync() (*mautrix.DefaultSyncer, error) {
 	)
 	err := sqlCryptoStore.CreateTables()
 	if err != nil {
-		log.Fatal("Could not create tables for the SQL crypto store:%v", err.Error())
+		log.Fatal("Could not create tables for the SQL crypto store: %s", err.Error())
 	}
 
 	b.olmMachine = mcrypto.NewOlmMachine(b.client, &CryptoLogger{}, sqlCryptoStore, b.stateStore)
