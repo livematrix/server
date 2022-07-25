@@ -99,6 +99,7 @@ func (s *Server) Err(err error) {
 func (s *Server) SendMatrixMessage(c *Client, msg JSONMessage) {
 	var r mid.RoomID
 	r = mid.RoomID(*c.session.RoomID)
+	log.Printf("message: %s\n RoomID: %s ", msg.String(), *c.session.RoomID)
 	content := format.RenderMarkdown(msg.Body, true, true)
 	s.Mautrix_client.SendMessage(r, &content)
 }

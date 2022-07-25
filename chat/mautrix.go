@@ -271,7 +271,10 @@ func (b *BotPlexer) Connect(recipient, srvr, uname, passwd string, encrypted boo
 		log.Fatalf("Couldn't login to the homeserver.")
 	}
 
-	syncer, err := b.Sync(encrypted)
+	//syncer, err := b.Sync(encrypted)
+	syncer := b.client.Syncer.(*mautrix.DefaultSyncer)
+	syncer.OnEventType(mevent.EventMessage, func(source mautrix.EventSource, event *mevent.Event) { go b.HandleMessage(source, event) })
+
 	if err != nil || syncer == nil {
 		log.Errorf("Error occurred: %v", err.Error())
 	}
