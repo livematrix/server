@@ -68,14 +68,6 @@ func (e *Session) GetById(id int) error {
 	return nil
 }
 
-func Hash254(args ...string) string {
-	hash := sha256.New()
-	for _, arg := range args {
-		hash.Write([]byte(arg))
-	}
-	return hex.EncodeToString(hash.Sum(nil))
-}
-
 //
 //
 //
@@ -119,4 +111,12 @@ func (s *Session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else {
 		log.Println(tokenCookie.Value)
 	}
+}
+
+func Hash254(args ...string) string {
+	hash := sha256.New()
+	for _, arg := range args {
+		hash.Write([]byte(arg))
+	}
+	return hex.EncodeToString(hash.Sum(nil))
 }
