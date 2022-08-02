@@ -68,6 +68,10 @@ func (e *Session) GetById(id int) error {
 	return nil
 }
 
+func (e *Session) GetSessionID() *string {
+	return e.SessionId
+}
+
 //
 //
 //

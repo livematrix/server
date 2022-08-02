@@ -47,6 +47,10 @@ func (c *Client) GetRoomId() *string {
 	return c.session.GetRoomId()
 }
 
+func (c *Client) GetSessionId() *string {
+	return c.session.GetSessionID()
+}
+
 func (c *Client) Conn() *websocket.Conn {
 	return c.ws
 }
@@ -68,6 +72,10 @@ func (c *Client) Done() {
 func (c *Client) Listen() {
 	go c.listenWrite()
 	c.listenRead()
+}
+
+func (c *Client) AppendNewMessage(msg *Message) {
+	c.server.AppendNewMessage(c, msg)
 }
 
 func (c *Client) GetJSONMessages() []*JSONMessage {
@@ -117,7 +125,7 @@ func (c *Client) listenRead() {
 			} else if err != nil {
 				c.server.Err(err)
 			} else {
-				c.server.clients[*c.session.SessionId].history = append(c.server.clients[*c.session.SessionId].history, NewMessage(&msg.Author, &msg.Body))
+				c.AppendNewMessage(NewMessage(&msg.Author, &msg.Body))
 				//broadcasting to same client sockets, excluding self:
 				c.server.Broadcast(c, &msg, true)
 				c.server.SendMatrixMessage(c, msg)

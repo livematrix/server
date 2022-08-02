@@ -96,6 +96,11 @@ func (s *Server) Err(err error) {
 	s.errCh <- err
 }
 
+func (s *Server) AppendNewMessage(client *Client, msg *Message) {
+	sessid := *client.GetSessionId()
+	s.clients[sessid].history = append(s.clients[sessid].history, msg)
+}
+
 func (s *Server) SendMatrixMessage(c *Client, msg JSONMessage) {
 	var r mid.RoomID
 	r = mid.RoomID(*c.session.RoomID)
